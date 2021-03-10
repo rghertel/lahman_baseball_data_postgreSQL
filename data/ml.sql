@@ -20,11 +20,6 @@ ORDER BY height
 	 Sort this list in descending order by the total salary earned. Which Vanderbilt player earned the most money in the majors?
 	 PLAYED @ VANDERBILT UNIVERSITY, FIRST/LAST NAME, total earned SALARY IN MAJOR LEAGUE*/
 	 
--- subquery
-/*SELECT schoolname
-FROM schools 
-WHERE schoolname = 'Vanderbilt University'*/
-
 SELECT p.playerid, p.namefirst, p.namelast, v.schoolname, salary.total_earnings
 FROM people AS p
 INNER JOIN (
@@ -87,11 +82,6 @@ WHERE yearid >= 1920
 GROUP BY decade
 ORDER BY decade
 
-SELECT FLOOR(yearid/10)*10 AS decade, ROUND(AVG(hr),2) AS avg_homeruns, ROUND(AVG(so),2) as avg_strikes
-FROM teams
-WHERE yearid >= 1920
-GROUP BY decade
-ORDER BY decade
 
 /* 6)Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. 
     (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.*/
@@ -111,7 +101,7 @@ ORDER BY stealing_perc DESC
 	 – determine why this is the case. Then redo your query, excluding the problem year. 
 	 How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? 
 	 What percentage of the time?*/
-	 
+
 --Part 1) Seattle Mariners 
 SELECT yearid, name, SUM(w) AS wins, SUM(l) AS losses, wswin AS world_series_wins
 FROM teams
@@ -127,8 +117,26 @@ GROUP BY yearid, name, wswin
 ORDER BY wins 
 
 --Part 3) 
-SELECT yearid, name, SUM(w) AS wins, SUM(l) AS losses, wswin AS world_series_wins
-FROM teams
-WHERE wswin = 'Y' AND yearid BETWEEN 1970 AND 2016
-GROUP BY yearid, name, wswin
-ORDER BY wins DESC
+with ws_list (yearid, name, wins)
+as (select yearid, name, sum(w) as wins
+   	from teams
+   where wswin = 'Y'
+   and yearid <> '1994'
+   group by yearid, name) ,/* this is table with team that won WS by year & win ct */
+   win_list (yearid, name, wins)
+ as (select yearid, name, sum(w) as wins
+	from teams
+	where yearid <> '1994'
+	group by yearid, name) /* this is table with wins per team per year */
+	
+select a.yearid,b.name, b.wins
+from (select yearid, max(wins) as mx_wins
+	from win_list
+	group by yearid) a /* Get the max number of wins per year */
+inner join ws_list b
+on a.yearid = b.yearid
+and b.wins = a.mx_wins
+where a.yearid between 1970 and 2016
+
+
+
