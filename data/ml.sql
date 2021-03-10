@@ -25,15 +25,21 @@ ORDER BY height
 FROM schools 
 WHERE schoolname = 'Vanderbilt University'*/
 
-SELECT p.namelast AS last_name, p.namefirst AS first_name,  s.salary,
-		(SELECT schoolname
-		FROM schools 
-		WHERE schoolname = 'Vanderbilt University') sub
+SELECT p.playerid, p.namefirst, p.namelast, v.schoolname, salary.total_earnings
 FROM people AS p
-JOIN salaries as s
-ON p.playerid = s.playerid
-ORDER BY s.salary DESC
-
+INNER JOIN (
+		select DISTINCT playerid, schoolname
+		from collegeplaying AS cp
+		inner join schools AS s
+		ON cp.schoolid = s.schoolid
+		where schoolname = 'Vanderbilt University') as v
+ON p.playerid = v.playerid
+INNER JOIN (
+		  Select playerid, SUM(salary) as total_earnings
+		  fROM salaries
+		  GROUP BY playerid) as salary ON p.playerid = salary.playerid
+ORDER BY total_earnings DESC
+		
 	
 /* 4)Using the fielding table, group players into three groups based on their position: 
      label players with position OF as "Outfield", those with position "SS", "1B", "2B", and "3B" as "Infield", and those with position "P" or "C" as "Battery". 
@@ -74,3 +80,55 @@ WHERE yearid >= 1920
 GROUP BY decade
 ORDER BY decade
 
+
+SELECT FLOOR(yearid/10)*10 AS decade, ROUND(AVG(hr),2) AS avg_homeruns, ROUND(AVG(so),2) as avg_strikes
+FROM batting
+WHERE yearid >= 1920
+GROUP BY decade
+ORDER BY decade
+
+SELECT FLOOR(yearid/10)*10 AS decade, ROUND(AVG(hr),2) AS avg_homeruns, ROUND(AVG(so),2) as avg_strikes
+FROM teams
+WHERE yearid >= 1920
+GROUP BY decade
+ORDER BY decade
+
+/* 6)Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. 
+    (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.*/
+
+SELECT b.playerid, p.namefirst, p.namelast, ROUND(100.0*b.sb/(b.sb+b.cs),2) AS stealing_perc
+FROM batting AS b
+INNER JOIN people AS p
+ON b.playerid = p.playerid
+WHERE yearid = 2016 AND b.sb + b.cs > 20
+GROUP BY b.playerid, p.namefirst, p.namelast, stealing_perc
+ORDER BY stealing_perc DESC
+
+
+/* 7)From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
+     What is the smallest number of wins for a team that did win the world series? 
+	 Doing this will probably result in an unusually small number of wins for a world series champion 
+	 – determine why this is the case. Then redo your query, excluding the problem year. 
+	 How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? 
+	 What percentage of the time?*/
+	 
+--Part 1) Seattle Mariners 
+SELECT yearid, name, SUM(w) AS wins, SUM(l) AS losses, wswin AS world_series_wins
+FROM teams
+WHERE wswin = 'N' AND yearid BETWEEN 1970 AND 2016
+GROUP BY yearid, name, wswin
+ORDER BY wins DESC
+
+--Part 2) Los Angeles Dodgers
+SELECT yearid, name, SUM(w) AS wins, SUM(l) AS losses, wswin AS world_series_wins
+FROM teams
+WHERE wswin = 'Y' AND yearid <> '1994'
+GROUP BY yearid, name, wswin
+ORDER BY wins 
+
+--Part 3) 
+SELECT yearid, name, SUM(w) AS wins, SUM(l) AS losses, wswin AS world_series_wins
+FROM teams
+WHERE wswin = 'Y' AND yearid BETWEEN 1970 AND 2016
+GROUP BY yearid, name, wswin
+ORDER BY wins DESC
