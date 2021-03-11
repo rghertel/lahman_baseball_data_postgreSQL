@@ -205,18 +205,59 @@ LIMIT 5;
 
 --Q9
 /*
-SELECT sub.namefirst, sub.namefirst, sub.namelast, sub.n_awards, am.lgid
+--subquery namelast = 'Cox'
+SELECT 
+ 	am.playerid, 
+	franchid,
+ 	p.namefirst, 
+ 	p.namelast, 
+	am.lgid
+FROM awardsmanagers AS am
+LEFT JOIN people AS p
+ON am.playerid = p.playerid
+LEFT JOIN appearances AS a
+ON am.playerid = a.playerid
+LEFT JOIN teams AS t
+ON t.teamid = a.teamid
+WHERE namelast = 'Cox'
+GROUP BY am.lgid, am.playerid, p.namefirst, p.namelast, awardid, franchid
+ORDER BY playerid
+*/
+/*
+SELECT 
+	sub.namefirst, 
+	sub.namelast, 
+	t.franchid,
+	am.lgid,
+	sub.total_n_awards
 FROM
-(SELECT am.playerid, p.namefirst, p.namelast, am.lgid, COUNT(awardid), COUNT(awardid) OVER(PARTITION BY am.playerid ORDER BY am.playerid) AS n_awards
+(SELECT 
+ 	am.playerid, 
+ 	p.namefirst, 
+ 	p.namelast, 
+ 	COUNT(awardid) AS count_awards, 
+ 	SUM(COUNT(awardid)) OVER(PARTITION BY am.playerid ORDER BY am.playerid) AS total_n_awards
 FROM awardsmanagers AS am
 JOIN people AS p
 ON am.playerid = p.playerid
-GROUP BY am.playerid, p.namefirst, p.namelast, am.lgid, awardid
+GROUP BY 
+ 	am.playerid, 
+ 	p.namefirst, 
+ 	p.namelast
 ORDER BY playerid) AS sub
 JOIN awardsmanagers AS am
 ON am.playerid = sub.playerid
-GROUP BY sub.n_awards, sub.namefirst, sub.namefirst, sub.namelast, am.lgid
-ORDER BY sub.n_awards DESC;
+LEFT JOIN people AS p
+ON am.playerid = p.playerid
+LEFT JOIN appearances AS a
+ON am.playerid = a.playerid
+LEFT JOIN teams AS t
+ON t.teamid = a.teamid
+GROUP BY sub.namefirst, sub.namefirst, sub.namelast, sub.total_n_awards, sub.count_awards, t.franchid, am.lgid
+ORDER BY sub.total_n_awards DESC;
 */
---A9
+--A9 BOBBY Cox. 12 Awards total. 1 AL, 1, ML, 3, NL, 7, NL. New York Yankees
 
+
+--Open-Ended Questions
+--Q10
