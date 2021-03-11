@@ -89,7 +89,8 @@ WHERE decade IS NOT NULL
 GROUP BY decade, total_games, total_strikeouts, strikeouts_per_game, homeruns, hr_per_game
 ORDER BY decade;
 */
---A5
+--A5 Home runs and strikeouts ave both increased exponentially since the 1920s
+
 --Q6
 /*
 SELECT 	p.namefirst, 
