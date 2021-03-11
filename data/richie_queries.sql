@@ -40,24 +40,24 @@ ORDER BY total_salary DESC, salary DESC;*/
 
 --Q4
 /*
-WITH p AS(
-SELECT playerid,
-CASE 
-	WHEN pos = 'OF' THEN 'Outfield'
-	WHEN pos IN('P','C') THEN 'Battery'
-	WHEN pos IN('SS','1B','2B','3B') THEN 'Infield'
-	ELSE 'Other' END AS position
-FROM fielding
-WHERE yearid = 2016
-GROUP BY playerid, position, fielding.pos)
-SELECT p.position, SUM(f.po)
-FROM fielding AS f
-JOIN p
-ON f.playerid = p.playerid
-WHERE yearid = 2016
-GROUP BY p.position;
+SELECT	position_label, 
+		SUM(po) AS putouts,
+		total_putouts_2016
+FROM(
+	SELECT 	playerid, 
+		po, 
+		pos,
+		CASE WHEN pos = 'OF' THEN 'Outfield'
+		WHEN pos IN('P','C') THEN 'Battery'
+		WHEN pos IN('SS','1B','2B','3B') THEN 'Infield'
+		END AS position_label,
+		SUM(po) OVER() AS total_putouts_2016
+	FROM fielding
+	WHERE yearid = 2016) AS sub
+GROUP BY position_label, total_putouts_2016;
 */
---A3 Outfield: 45,231; Infield: 116,636; Battery: 45,202
+--A3 Outfield: 29,560; Infield: 58,934; Battery: 41,424
+--129,918 total putouts in 2016
 
 --Q5
 /*
@@ -114,6 +114,20 @@ FROM teams
 WHERE yearid BETWEEN 1970 and 2016 AND yearid <> 1994
 ORDER BY yearid, w DESC;
 */
+--Q7C
+/*
+SELECT COUNT(winvalue) AS total_top_wins_year, SUM(winvalue) AS also_ws_win, ROUND(SUM((winvalue)*1.0)/COUNT((winvalue)*1.0),3) AS perc_highwins_ws
+FROM (
+SELECT yearid, teamid, win_rank, w, wswin, CASE WHEN wswin = 'Y' THEN 1 ELSE 0 END AS winvalue
+FROM( --subquery for rank, grouped by year and ordered by highest ranked wins
+SELECT yearid, teamid, ROW_NUMBER() OVER(PARTITION BY yearid ORDER BY w DESC) AS win_rank, w, wswin
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
+GROUP BY yearid, teamid, w, wswin
+ORDER BY yearid, wswin DESC, w DESC) AS sub
+WHERE win_rank = 1 AND wswin IS NOT NULL --NOT null will exclude 1994
+) AS sub2;
+*/
 -- A7(A) 116 wins by Seattle in 2001 (did not win World Series)
 -- A7(B) 63 wins by LA Dodgers in 1981 (Won the World Series) - 60 less games that season
 		-- STRIKE from June 12 - July 31 1981
@@ -130,6 +144,7 @@ ORDER BY yearid, w DESC;
 --1978, Y
 --1979, N
 --1980, N
+--1981, N
 --1982, N
 --1983, N
 --1984, Y
@@ -188,6 +203,7 @@ LIMIT 5;
 --Chicago White Sox; U.S. Cellular Field 21,559.17
 
 --Q9
+/*
 SELECT sub.namefirst, sub.namefirst, sub.namelast, sub.n_awards, am.lgid
 FROM
 (SELECT am.playerid, p.namefirst, p.namelast, am.lgid, COUNT(awardid), COUNT(awardid) OVER(PARTITION BY am.playerid ORDER BY am.playerid) AS n_awards
@@ -200,5 +216,6 @@ JOIN awardsmanagers AS am
 ON am.playerid = sub.playerid
 GROUP BY sub.n_awards, sub.namefirst, sub.namefirst, sub.namelast, am.lgid
 ORDER BY sub.n_awards DESC;
+*/
 --A9
 
