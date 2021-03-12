@@ -134,8 +134,10 @@ INTERSECT
 SELECT yearid, teamid, MAX(w) OVER(PARTITION BY yearid)
 FROM teams
 WHERE yearid BETWEEN 1970 AND 2016
+ORDER BY yearid;
 */
 /*
+--MY Function doesn't work with two max winners in 2013
 SELECT COUNT(winvalue) AS total_top_wins_year, SUM(winvalue) AS also_ws_win, ROUND(SUM((winvalue)*1.0)/COUNT((winvalue)*1.0),3) AS perc_highwins_ws
 FROM (
 SELECT yearid, teamid, win_rank, w, wswin, CASE WHEN wswin = 'Y' THEN 1 ELSE 0 END AS winvalue
@@ -144,62 +146,15 @@ SELECT yearid, teamid, ROW_NUMBER() OVER(PARTITION BY yearid ORDER BY w DESC) AS
 FROM teams
 WHERE yearid BETWEEN 1970 AND 2016
 GROUP BY yearid, teamid, w, wswin
-ORDER BY yearid, wswin DESC, w DESC) AS sub
+ORDER BY wswin DESC, yearid, w DESC) AS sub
 WHERE win_rank = 1 AND wswin IS NOT NULL --NOT null will exclude 1994
 ) AS sub2;
 */
-
 -- A7(A) 116 wins by Seattle in 2001 (did not win World Series)
 -- A7(B) 63 wins by LA Dodgers in 1981 (Won the World Series) - 60 less games that season
 		-- STRIKE from June 12 - July 31 1981
 		-- STRIKE in August of 1994. NO post season.
---A7(C) 45/46 RECORDS 11/11 OR .24444/.23913. Less than a quarter of the time
---1970, Y
---1971, N
---1972, N
---1973, N
---1974, N
---1975, Y
---1976, Y
---1977, N
---1978, Y
---1979, N
---1980, N
---1981, N
---1982, N
---1983, N
---1984, Y
---1985, N
---1986, Y
---1987, N
---1988, N
---1989, Y
---1990, N
---1991, N
---1992, N
---1993, N
---1995, N
---1996, N
---1997, N
---1998, Y
---1999, N
---2000, N
---2001, N
---2002, N
---2003, N
---2004, N
---2005, N
---2006, N
---2007, Y
---2008, N
---2009, Y
---2010, N
---2011, N
---2012, N
---2013, N
---2014, N
---2015, N
---2016, Y
+--A7(C) 46 RECORDS 12 OR .2608
 
 --Q8
 --highest
@@ -240,25 +195,8 @@ LIMIT 5;
 --Chicago White Sox; U.S. Cellular Field 21,559.17
 
 --Q9
-/*
-SELECT p.playerid, p.namefirst, p.namelast, sub.awardid, sub.lgid, COUNT(sub.awardid)
-FROM (
-SELECT *
-FROM awardsmanagers AS am
-WHERE am.lgid = 'AL' OR am.lgid = 'NL') AS sub
-JOIN people AS p
-ON sub.playerid = p.playerid
-LEFT JOIN appearances AS a
-ON sub.playerid = a.playerid
-LEFT JOIN teams AS t
-ON t.teamid = a.teamid
-WHERE sub.awardid = 'TSN Manager of the Year'
-GROUP BY 1, 2, 3, 4, 5
-ORDER BY p.playerid
-;
-*/
 --RYAN'S FUNCTION
-
+/*
 SELECT a.playerid, a.yearid, a.lgid, p.namefirst, p.namelast, m.teamid
 FROM awardsmanagers AS a
 LEFT JOIN people AS p
@@ -273,35 +211,18 @@ INTERSECT
 SELECT playerid
 FROM awardsmanagers
 WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL')
-
-
-
-SELECT 
-	sub.namefirst, 
-	sub.namelast, 
-	sub.awardid,
-	t.franchid,
-	sub.lgid,
-	sub.total_n_awards
-FROM
-(SELECT 
- 	am.playerid,
-	am.awardid,
- 	am.lgid,
- 	p.namefirst, 
- 	p.namelast, 
- 	COUNT(awardid) AS count_awards, 
+ORDER BY playerid;
+*/
+/*
+--Richie's Formula no good
+SELECT sub.namefirst, sub.namelast, sub.awardid, t.franchid, sub.lgid, sub.total_n_awards
+FROM (SELECT am.playerid, am.awardid, am.lgid, p.namefirst, p.namelast, COUNT(awardid) AS count_awards, 
  	SUM(COUNT(awardid)) OVER(PARTITION BY am.playerid ORDER BY am.playerid) AS total_n_awards
 FROM awardsmanagers AS am
 JOIN people AS p
 ON am.playerid = p.playerid
 WHERE awardid = 'TSN Manager of the Year'
-GROUP BY 
- 	am.playerid,
- 	am.lgid,
-	am.awardid,
- 	p.namefirst, 
- 	p.namelast
+GROUP BY am.playerid, am.lgid, am.awardid, p.namefirst, p.namelast
 ORDER BY playerid) AS sub
 LEFT JOIN people AS p
 ON sub.playerid = p.playerid
@@ -313,26 +234,8 @@ WHERE sub.lgid = 'AL' OR sub.lgid = 'NL'
 GROUP BY sub.namefirst, sub.namefirst, sub.namelast, sub.total_n_awards, sub.count_awards, t.franchid, sub.lgid, sub.awardid
 HAVING total_n_awards > 1
 ORDER BY sub.total_n_awards DESC;
-/*
-SELECT 
- 	am.playerid,
-	am.awardid,
- 	p.namefirst, 
- 	p.namelast, 
- 	COUNT(awardid) AS count_awards, 
- 	SUM(COUNT(awardid)) OVER(PARTITION BY am.playerid ORDER BY am.playerid) AS total_n_awards
-FROM awardsmanagers AS am
-JOIN people AS p
-ON am.playerid = p.playerid
-WHERE awardid = 'TSN Manager of the Year'
-GROUP BY 
- 	am.playerid,
-	am.awardid,
- 	p.namefirst, 
- 	p.namelast
-ORDER BY playerid
 */
---A9 BOBBY Cox. 12 Awards total. 1 AL, 1, ML, 3, NL, 7, NL. New York Yankees
+--A9 Davey Johnson and Jim Leyland
 
 
 --Open-Ended Questions
