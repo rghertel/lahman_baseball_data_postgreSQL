@@ -24,6 +24,7 @@ ORDER BY height;
 -- A2: Edward "Eddie" Carl Gaedel 43 inches, he played one game, St. Louis Browns
 
 --Q3
+
 /*
 SELECT p.playerid, namefirst, namelast, s.schoolname, s1.salary, SUM(s1.salary) OVER(PARTITION BY p.playerid) AS total_salary
 FROM people AS p
@@ -35,10 +36,18 @@ JOIN salaries AS s1
 ON s1.playerid = p.playerid
 WHERE s.schoolname LIKE '%Vander%'
 GROUP BY p.playerid, namefirst, namelast, s.schoolname, s1.salary
-ORDER BY total_salary DESC, salary DESC;*/
+ORDER BY total_salary DESC, salary DESC;
+*/
 --A3. David Price's largest salary was $30,000,000; total_income was $81,851,296
 
 --Q4
+--verify total putouts from fielding table
+/*
+SELECT SUM(po)
+FROM fielding
+WHERE yearid = 2016;
+*/
+--full query
 /*
 SELECT	position_label, 
 		SUM(po) AS putouts,
@@ -99,7 +108,7 @@ SELECT 	p.namefirst,
 		sb, 
 		cs,
 		(sb + cs) AS steal_attempts,
-		ROUND(1.00 * sb / (sb + cs),2) AS stolen_bases_perc					
+		ROUND(1.00 * sb / (sb + cs),3) AS stolen_bases_perc					
 FROM batting AS b
 JOIN people AS p
 ON b.playerid = p.playerid
@@ -117,6 +126,16 @@ ORDER BY yearid, w DESC;
 */
 --Q7C
 /*
+---RYAN'S
+SELECT yearid, teamid, w
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016 AND WSWin = 'Y' 
+INTERSECT
+SELECT yearid, teamid, MAX(w) OVER(PARTITION BY yearid)
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
+*/
+/*
 SELECT COUNT(winvalue) AS total_top_wins_year, SUM(winvalue) AS also_ws_win, ROUND(SUM((winvalue)*1.0)/COUNT((winvalue)*1.0),3) AS perc_highwins_ws
 FROM (
 SELECT yearid, teamid, win_rank, w, wswin, CASE WHEN wswin = 'Y' THEN 1 ELSE 0 END AS winvalue
@@ -129,6 +148,7 @@ ORDER BY yearid, wswin DESC, w DESC) AS sub
 WHERE win_rank = 1 AND wswin IS NOT NULL --NOT null will exclude 1994
 ) AS sub2;
 */
+
 -- A7(A) 116 wins by Seattle in 2001 (did not win World Series)
 -- A7(B) 63 wins by LA Dodgers in 1981 (Won the World Series) - 60 less games that season
 		-- STRIKE from June 12 - July 31 1981
@@ -182,6 +202,7 @@ WHERE win_rank = 1 AND wswin IS NOT NULL --NOT null will exclude 1994
 --2016, Y
 
 --Q8
+--highest
 /*
 SELECT h.year, tf.franchname, p.park_name, games, h.attendance, ROUND((h.attendance*1.0)/(games*1.0),2) AS avg_attendance_game
 FROM homegames AS h
@@ -191,7 +212,22 @@ LEFT JOIN teams AS t
 ON h.team = t.teamid
 LEFT JOIN teamsfranchises AS tf
 ON t.franchid = tf.franchid
-WHERE year = 2016 AND games > 10
+WHERE year = 2016 AND games >= 10
+GROUP BY h.team, tf.franchname, p.park_name, games, h.attendance, avg_attendance_game, h.year
+ORDER BY avg_attendance_game DESC
+LIMIT 1;
+*/
+--lowest
+/*
+SELECT h.year, tf.franchname, p.park_name, games, h.attendance, ROUND((h.attendance*1.0)/(games*1.0),2) AS avg_attendance_game
+FROM homegames AS h
+JOIN parks AS p
+ON h.park = p.park
+LEFT JOIN teams AS t
+ON h.team = t.teamid
+LEFT JOIN teamsfranchises AS tf
+ON t.franchid = tf.franchid
+WHERE year = 2016 AND games >= 10
 GROUP BY h.team, tf.franchname, p.park_name, games, h.attendance, avg_attendance_game, h.year
 ORDER BY avg_attendance_game
 LIMIT 5;
@@ -205,34 +241,53 @@ LIMIT 5;
 
 --Q9
 /*
---subquery namelast = 'Cox'
-SELECT 
- 	am.playerid, 
-	franchid,
- 	p.namefirst, 
- 	p.namelast, 
-	am.lgid
+SELECT p.playerid, p.namefirst, p.namelast, sub.awardid, sub.lgid, COUNT(sub.awardid)
+FROM (
+SELECT *
 FROM awardsmanagers AS am
-LEFT JOIN people AS p
-ON am.playerid = p.playerid
+WHERE am.lgid = 'AL' OR am.lgid = 'NL') AS sub
+JOIN people AS p
+ON sub.playerid = p.playerid
 LEFT JOIN appearances AS a
-ON am.playerid = a.playerid
+ON sub.playerid = a.playerid
 LEFT JOIN teams AS t
 ON t.teamid = a.teamid
-WHERE namelast = 'Cox'
-GROUP BY am.lgid, am.playerid, p.namefirst, p.namelast, awardid, franchid
-ORDER BY playerid
+WHERE sub.awardid = 'TSN Manager of the Year'
+GROUP BY 1, 2, 3, 4, 5
+ORDER BY p.playerid
+;
 */
-/*
+--RYAN'S FUNCTION
+
+SELECT a.playerid, a.yearid, a.lgid, p.namefirst, p.namelast, m.teamid
+FROM awardsmanagers AS a
+LEFT JOIN people AS p
+ON a.playerid = p.playerid
+LEFT JOIN managers as m
+ON a.playerid = m.playerid AND a.yearid = m.yearid
+WHERE awardid = 'TSN Manager of the Year' AND a.playerid IN (
+SELECT playerid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'NL'
+INTERSECT
+SELECT playerid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL')
+
+
+
 SELECT 
 	sub.namefirst, 
 	sub.namelast, 
+	sub.awardid,
 	t.franchid,
-	am.lgid,
+	sub.lgid,
 	sub.total_n_awards
 FROM
 (SELECT 
- 	am.playerid, 
+ 	am.playerid,
+	am.awardid,
+ 	am.lgid,
  	p.namefirst, 
  	p.namelast, 
  	COUNT(awardid) AS count_awards, 
@@ -240,24 +295,105 @@ FROM
 FROM awardsmanagers AS am
 JOIN people AS p
 ON am.playerid = p.playerid
+WHERE awardid = 'TSN Manager of the Year'
 GROUP BY 
- 	am.playerid, 
+ 	am.playerid,
+ 	am.lgid,
+	am.awardid,
  	p.namefirst, 
  	p.namelast
 ORDER BY playerid) AS sub
-JOIN awardsmanagers AS am
-ON am.playerid = sub.playerid
 LEFT JOIN people AS p
-ON am.playerid = p.playerid
+ON sub.playerid = p.playerid
 LEFT JOIN appearances AS a
-ON am.playerid = a.playerid
+ON sub.playerid = a.playerid
 LEFT JOIN teams AS t
 ON t.teamid = a.teamid
-GROUP BY sub.namefirst, sub.namefirst, sub.namelast, sub.total_n_awards, sub.count_awards, t.franchid, am.lgid
+WHERE sub.lgid = 'AL' OR sub.lgid = 'NL'
+GROUP BY sub.namefirst, sub.namefirst, sub.namelast, sub.total_n_awards, sub.count_awards, t.franchid, sub.lgid, sub.awardid
+HAVING total_n_awards > 1
 ORDER BY sub.total_n_awards DESC;
+/*
+SELECT 
+ 	am.playerid,
+	am.awardid,
+ 	p.namefirst, 
+ 	p.namelast, 
+ 	COUNT(awardid) AS count_awards, 
+ 	SUM(COUNT(awardid)) OVER(PARTITION BY am.playerid ORDER BY am.playerid) AS total_n_awards
+FROM awardsmanagers AS am
+JOIN people AS p
+ON am.playerid = p.playerid
+WHERE awardid = 'TSN Manager of the Year'
+GROUP BY 
+ 	am.playerid,
+	am.awardid,
+ 	p.namefirst, 
+ 	p.namelast
+ORDER BY playerid
 */
 --A9 BOBBY Cox. 12 Awards total. 1 AL, 1, ML, 3, NL, 7, NL. New York Yankees
 
 
 --Open-Ended Questions
 --Q10
+/*
+SELECT 
+	schoolname, 
+	schoolstate, 
+	COUNT(DISTINCT p.playerid) AS n_players, 
+	SUM(COALESCE(salary,0)) AS total_salaries
+FROM schools AS s
+LEFT JOIN collegeplaying AS cp
+ON s.schoolid = cp.schoolid
+LEFT JOIN people AS p
+ON cp.playerid = p.playerid
+LEFT JOIN salaries AS sl
+ON p.playerid = sl.playerid
+WHERE schoolstate = 'TN'
+GROUP BY schoolname, schoolstate
+ORDER BY 4 DESC;
+*/
+--University of TN has had 41 players witn a total salary of $985,207,966.
+
+
+--Q11
+
+
+--A11
+
+
+--Q12
+/*
+SELECT 
+	park, 
+	franchid
+	yearid, 
+	w, 
+	l,
+	ROUND(((w*1.0)/(g*1.9)),2) AS win_perc,
+	wswin,
+	attendance,
+	RANK() OVER(ORDER BY attendance DESC)AS attendance_rank
+FROM teams
+WHERE yearid = 2013
+ORDER BY win_perc DESC
+*/
+/*
+SELECT 
+	park, 
+	franchid,
+	yearid, 
+	w, 
+	l,
+	ROUND(((w*1.0)/(g*1.9)),2) AS win_perc,
+	wswin,
+	attendance,
+	RANK() OVER(PARTITION BY yearid ORDER BY attendance DESC)AS attendance_rank
+FROM teams
+WHERE yearid IN (2012, 2013, 2014, 2014)
+GROUP BY yearid, 1, 2, 4, 5, 6, 7, 8
+ORDER BY yearid;
+*/
+--A12(A) 2016 proved nothing. Dodger stadium has the largest capacity and is usually ranked #1 for attendance
+--A13(B)
