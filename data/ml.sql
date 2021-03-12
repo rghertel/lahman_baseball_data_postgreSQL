@@ -19,7 +19,7 @@ ORDER BY height
      Create a list showing each player’s first and last names as well as the total salary they earned in the major leagues. 
 	 Sort this list in descending order by the total salary earned. Which Vanderbilt player earned the most money in the majors?
 	 PLAYED @ VANDERBILT UNIVERSITY, FIRST/LAST NAME, total earned SALARY IN MAJOR LEAGUE*/
-	 
+-- Ans: David Price 81,851,296	 
 SELECT p.playerid, p.namefirst, p.namelast, v.schoolname, salary.total_earnings
 FROM people AS p
 INNER JOIN (
@@ -39,8 +39,8 @@ ORDER BY total_earnings DESC
 /* 4)Using the fielding table, group players into three groups based on their position: 
      label players with position OF as "Outfield", those with position "SS", "1B", "2B", and "3B" as "Infield", and those with position "P" or "C" as "Battery". 
 	 Determine the number of putouts made by each of these three groups in 2016.*/
-	 
-SELECT COUNT(po) AS num_putout,
+-- ANS: Battery 41424, Infield 58934, Outfield 29560	 
+SELECT SUM(po) AS num_putout,
 	CASE pos WHEN 'OF' THEN 'Outfield'
 		     WHEN 'SS' THEN 'Infield'
 			 WHEN '1B' THEN 'Infield'
@@ -54,28 +54,28 @@ WHERE yearid = 2016
 GROUP BY field_position
 
 
+--Rachel's Query
+WITH pf AS (
+SELECT playerid, pos, po, yearid,
+CASE 
+	WHEN pos = 'OF' THEN 'Outfield'
+	WHEN pos IN ('SS','1B','2B','3B') THEN 'Infield'
+	ELSE 'Battery' 
+	END AS position
+FROM fielding)
+
+SELECT pf.position, SUM(pf.po)
+FROM pf
+JOIN fielding AS f
+ON f.playerid = pf.playerid
+WHERE f.yearid = 2016
+GROUP BY pf.position;
+
+
 /* 5)Find the average number of strikeouts per game by decade since 1920. 
      Round the numbers you report to 2 decimal places. Do the same for home runs per game. Do you see any trends?*/
 -- Trend: 1950's saw on average an increase in both homeruns and strikeouts 
-
-SELECT 
-	   CASE WHEN yearid BETWEEN 1920 AND 1929 THEN '1920'
-	    WHEN yearid BETWEEN 1930 AND 1939 THEN '1930'
-	    WHEN yearid BETWEEN 1940 AND 1949 THEN '1940'
-	    WHEN yearid BETWEEN 1950 AND 1959 THEN '1950'
-	    WHEN yearid BETWEEN 1960 AND 1969 THEN '1960'
-	    WHEN yearid BETWEEN 1970 AND 1979 THEN '1970'
-	    WHEN yearid BETWEEN 1980 AND 1989 THEN '1980'
-	    WHEN yearid BETWEEN 1990 AND 1999 THEN '1990'
-	    WHEN yearid BETWEEN 2000 AND 2009 THEN '2000'
-	   ELSE '2010' END decade,
-	   ROUND(AVG(hr),2) AS avg_homeruns, ROUND(AVG(so),2) as avg_strikes
-from battingpost
-WHERE yearid >= 1920
-GROUP BY decade
-ORDER BY decade
-
-
+-- FIX
 SELECT FLOOR(yearid/10)*10 AS decade, ROUND(AVG(hr),2) AS avg_homeruns, ROUND(AVG(so),2) as avg_strikes
 FROM batting
 WHERE yearid >= 1920
@@ -85,7 +85,7 @@ ORDER BY decade
 
 /* 6)Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. 
     (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.*/
-
+-- ANS: Chris Owings
 SELECT b.playerid, p.namefirst, p.namelast, ROUND(100.0*b.sb/(b.sb+b.cs),2) AS stealing_perc
 FROM batting AS b
 INNER JOIN people AS p
@@ -116,7 +116,7 @@ WHERE wswin = 'Y' AND yearid <> '1994'
 GROUP BY yearid, name, wswin
 ORDER BY wins 
 
---Part 3) 
+--Part 3) 12 Teams
 with ws_list (yearid, name, wins)
 as (select yearid, name, sum(w) as wins
    	from teams
@@ -138,5 +138,52 @@ on a.yearid = b.yearid
 and b.wins = a.mx_wins
 where a.yearid between 1970 and 2016
 
+--Ryan's Query for part 3
+SELECT yearid, teamid, w
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016 AND WSWin = 'Y' 
+INTERSECT
+SELECT yearid, teamid, MAX(w) OVER(PARTITION BY yearid)
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
 
+
+
+/* 8)Using the attendance figures from the homegames table, 
+     find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). 
+	 Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.*/
+
+--top 5 Dodgers, Cardinals, Blue Jays, Giants, Cubs
+SELECT DISTINCT t.name, t.park, SUM(h.attendance)/SUM(h.games) as avg_att
+FROM teams AS t
+INNER JOIN homegames AS h
+ON t.teamid = h.team AND t.yearid = h.year
+WHERE year = 2016 AND games >= 10
+GROUP BY t.name, t.park
+ORDER BY avg_att DESC
+LIMIT 5
+
+
+--bottom 5 Rays, Athletics, Indians, Marlins, White Sox
+SELECT DISTINCT t.name, t.park, SUM(h.attendance)/SUM(h.games) as avg_att
+FROM teams AS t
+INNER JOIN homegames AS h
+ON t.teamid = h.team AND t.yearid = h.year
+WHERE year = 2016 AND games >= 10
+GROUP BY t.name, t.park
+ORDER BY avg_att 
+LIMIT 5
+
+
+/* 9)Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
+     Give their full name and the teams that they were managing when they won the award.*/
+	 
+SELECT p.namegiven, t.teamid, a.lgid, a.awardid
+FROM awardsmanagers AS a
+INNER JOIN people AS p
+ON a.playerid = p.playerid
+INNER JOIN teams
+ON a.playerid = t.playerid
+WHERE awardid = 'TSN Manager of the Year' AND lgid IN ('AL','NL')
+GROUP BY p.namegiven, a.lgid, a.awardid
 
