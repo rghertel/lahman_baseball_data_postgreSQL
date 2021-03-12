@@ -57,6 +57,7 @@ FROM(
 	FROM fielding
 	WHERE yearID = 2016) AS sub
 GROUP BY position_label
+-- ANS: Battery: 41424, Infield: 58934, Outfield: 29560
 
 -- Question 5:
 SELECT *,
@@ -138,17 +139,87 @@ FROM teams
 WHERE yearid BETWEEN 1970 AND 2016 AND WSWin = 'N' 
 ORDER BY w DESC
 -- ANS: 116 wins in 2001
+-- How often was WS winner highest game winner
+SELECT yearid, teamid, w
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016 AND WSWin = 'Y' 
+INTERSECT
+SELECT yearid, teamid, MAX(w) OVER(PARTITION BY yearid)
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
+--ANS: 12 times
+-- What percentage?
+WITH a AS(
+	SELECT yearid, teamid, w
+	FROM teams
+	WHERE yearid BETWEEN 1970 AND 2016 AND WSWin = 'Y' 
+	INTERSECT
+	SELECT yearid, teamid, MAX(w) OVER(PARTITION BY yearid)
+	FROM teams
+	WHERE yearid BETWEEN 1970 AND 2016)
+SELECT 100 * CAST(COUNT(*) AS float) / (2016.0-1970.0)
+FROM a
+-- ANS: 26%
 
 -- Question 8: 
-SELECT DISTINCT p.park_name,  h.attendance / h.games AS avg_attendance
+SELECT DISTINCT p.park_name, t.name, h.attendance / h.games AS avg_attendance
 FROM homegames AS h
 INNER JOIN teams AS t
-ON t.teamid = h.team
+ON t.teamid = h.team AND h.year = t.yearid
 INNER JOIN parks AS p
 ON p.park = h.park
 WHERE year = 2016 AND games >=10
 ORDER BY avg_attendance DESC
 LIMIT 5
 
+SELECT DISTINCT p.park_name, t.name, h.attendance / h.games AS avg_attendance
+FROM homegames AS h
+INNER JOIN teams AS t
+ON t.teamid = h.team AND h.year = t.yearid
+INNER JOIN parks AS p
+ON p.park = h.park
+WHERE year = 2016 AND games >=10
+ORDER BY avg_attendance
+LIMIT 5
+
+--Question 9:
+SELECT a.playerid, a.yearid, a.lgid, p.namefirst, p.namelast, m.teamid
+FROM awardsmanagers AS a
+LEFT JOIN people AS p
+ON a.playerid = p.playerid
+LEFT JOIN managers as m
+ON a.playerid = m.playerid AND a.yearid = m.yearid
+WHERE awardid = 'TSN Manager of the Year' AND a.playerid IN (
+SELECT playerid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'NL'
+INTERSECT
+SELECT playerid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL')
+-- ANS: Jim Leyland for PIT and DET and Davey Johnson for BAL and WAS
+
+--Question 10
 SELECT *
-FROM homegames 
+FROM schools
+WHERE schoolstate = 'TN'
+-- number of players by school:
+SELECT schoolid, COUNT(*) AS number_of_players
+FROM collegeplaying
+WHERE schoolid IN(
+	SELECT schoolid
+	FROM schools
+	WHERE schoolstate = 'TN')
+GROUP BY schoolid
+ORDER BY number_of_players DESC
+
+SELECT c.playerid, SUM(salary) OVER(PARTITION BY c.playerid) AS total_salary
+FROM collegeplaying AS c
+INNER JOIN salaries AS s
+ON c.playerid = s.playerid
+WHERE schoolid IN(
+	SELECT schoolid
+	FROM schools
+	WHERE schoolstate = 'TN')
+GROUP BY c.playerid, salary
+ORDER BY total_salary DESC
