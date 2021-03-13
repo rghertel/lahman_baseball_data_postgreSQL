@@ -24,11 +24,13 @@ WHERE playerid IN
 		(SELECT MIN(height)
 		FROM people));
 		
-SELECT DISTINCT G_all, a.teamid, t.name
+SELECT DISTINCT G_all, a.teamid, t.name, p.playerid, p.namefirst, p.namelast
 FROM appearances AS a
 LEFT JOIN teams AS t
 ON a.teamid = t.teamid
-WHERE playerid IN
+JOIN people AS p
+ON a.playerid = p.playerid
+WHERE p.playerid IN
 	(SELECT playerid
 	FROM people
 	WHERE height =
@@ -74,9 +76,6 @@ Determine the number of putouts made by each of these three groups in 2016.*/ --
 SELECT *
 FROM fielding;
 
-/*Group players into three categories of positions. Turn that table into a CTE. Join it to fielding table on playerid, sum the putouts
-per position, and group by position*/
-
 SELECT SUM(po)
 FROM fielding
 WHERE yearid = 2016
@@ -93,6 +92,8 @@ CASE
 	WHERE yearid = 2016) AS sub
 --total putouts 2016: 129,918
 
+/*Group players into three categories of positions. Turn that table into a CTE. Sum putouts by position and pull from CTE table*/
+
 WITH pf AS (
 SELECT playerid, pos, po, yearid,
 CASE 
@@ -103,13 +104,10 @@ CASE
 FROM fielding
 WHERE yearid = 2016)
 
-SELECT pf.position, SUM(f.po)
-FROM fielding AS f
-JOIN pf
-ON f.playerid = pf.playerid
-WHERE f.yearid = 2016
+SELECT pf.position, SUM(pf.po)
+FROM pf
 GROUP BY pf.position
---Battery: 317,472 / Infield: 689,431 / Outfield: 285,322
+--Battery: 41,424 / Infield: 58,934 / Outfield: 29,560
 
 SELECT position_label, SUM(po) AS total_putouts
 FROM(
@@ -191,12 +189,11 @@ ON b.playerid = p.playerid
 WHERE sb >= 20
 AND yearid = 2016
 ORDER BY perc_stolen DESC;
---Christ Owings: 90.48
+--Christ Owings: 91.30
 
-/*7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
+/* 7ab. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
 What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually 
-small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. 
-How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? (12 HALP) What percentage of the time?*/
+small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year.*/
 
 /*Following two queries select relevant columns in team table, filtering years between 1970 and 2016, and if team won World Series*/
 SELECT yearid, teamid, name, w, wswin
@@ -230,39 +227,32 @@ AND yearid <> 1981
 ORDER BY w;
 --(without 1981 included) St. Louis Cardinals: 83 in 2006
 
-SELECT yearid, name, w, wswin,
-OVER(PARTITION BY yearid) AS max_wins
-FROM teams
-WHERE yearid BETWEEN 1970 AND 2016
-ORDER BY max_wins
+/* 7c. How often from 1970 – 2016 was it the case that a team with the most wins 
+also won the world series? What percentage of the time?*/
 
-SELECT yearid, teamid, w
-FROM teams
-WHERE yearid BETWEEN 1970 AND 2016 AND WSWin = 'Y' 
-INTERSECT
-SELECT yearid, teamid, MAX(w) OVER(PARTITION BY yearid)
-FROM teams
-WHERE yearid BETWEEN 1970 AND 2016
-
-SELECT t.teamid, t.name, t.wswin, sub.max_wins, sub.yearid
-FROM(
-	SELECT MAX(w) AS max_wins, yearid, name
-	FROM teams
-	WHERE yearid BETWEEN 1970 AND 2016
-	GROUP BY yearid,name
-ORDER BY yearid) AS sub
-INNER JOIN teams AS t
-on sub.yearid = t.yearid AND sub.name = t.name
-ORDER BY yearid
-
-SELECT COUNT(wswin)
+/*Select same columns as above. Add a column with a window function to report highest wins
+per year. Turn this into a subquery, and count the columns where both max_wins_per_year matches wins
+column and team won world series. Move wswin filter to outer query.*/
+SELECT COUNT(*)
 FROM (
-	SELECT MAX(w), yearid, wswin
+	SELECT yearid, teamid, name, w, wswin,
+		MAX(w) OVER(PARTITION BY yearid) AS max_wins_per_year
 	FROM teams
 	WHERE yearid BETWEEN 1970 AND 2016
-	GROUP BY yearid, wswin
-	ORDER BY yearid) AS sub
-WHERE wswin = 'Y'
+		AND yearid <> 1981) AS sub
+WHERE w = max_wins_per_year
+	AND wswin = 'Y'
+--12 times
+
+SELECT ROUND((CAST(SUM(CASE WHEN wswin = 'Y' THEN 1 ELSE 0 END) AS numeric)*100 / COUNT(*)),2)
+FROM(
+	SELECT yearid, teamid, name, w, wswin,
+		MAX(w) OVER(PARTITION BY yearid) AS max_wins_per_year
+	FROM teams
+	WHERE yearid BETWEEN 1970 AND 2016
+		AND yearid NOT IN (1981, 1994)) AS sub
+WHERE w = max_wins_per_year
+--23.53%
 
 /* 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average 
 attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). 
@@ -311,6 +301,7 @@ LIMIT 5;
 /* 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
 Give their full name and the teams that they were managing when they won the award.*/
 
+--Create two CTEs to find TSN awards among managers for the NL and for the AL
 ;WITH nl AS (SELECT playerid, awardid, yearid, lgid
 FROM awardsmanagers
 WHERE awardid ILIKE '%TSN%'
@@ -323,27 +314,59 @@ WHERE awardid ILIKE '%TSN%'
 AND lgid = 'AL'
 ORDER BY playerid)
 
+--Intersect to get the ID's of managers in both tables.
 SELECT playerid
 FROM nl
 INTERSECT
 SELECT playerid
-FROM al
+FROM al;
 
-SELECT * 
-FROM managers
+/*Turn above into a subquery that filters awardsmanagers table to managers who have won awards in both the NL and AL.
+Filter to their TSN awards only. Get all the years they've won it.*/
 
---RYAN
-SELECT a.playerid, a.yearid, a.lgid, p.namefirst, p.namelast, m.teamid
-FROM awardsmanagers AS a
-LEFT JOIN people AS p
-ON a.playerid = p.playerid
-LEFT JOIN managers as m
-ON a.playerid = m.playerid AND a.yearid = m.yearid
-WHERE awardid = 'TSN Manager of the Year' AND a.playerid IN (
-SELECT playerid
+SELECT playerid, awardid, yearid, lgid
 FROM awardsmanagers
-WHERE awardid = 'TSN Manager of the Year' AND lgid = 'NL'
-INTERSECT
-SELECT playerid
+WHERE awardid ILIKE '%TSN%'
+AND playerid IN(
+	SELECT playerid
+	FROM nl
+	INTERSECT
+	SELECT playerid
+	FROM al);
+
+/*Finally, nest into another query on a JOIN. Grab full names from people table, join on playerid. 
+Team name is in teams, but teamid is needed to join teams table, so join managers table on both year
+and playerid to avoid duplicates. Finally join teams table to managers table on both year and teamid,
+also to avoid duplicates*/
+
+;WITH nl AS (SELECT playerid, awardid, yearid, lgid
 FROM awardsmanagers
-WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL')
+WHERE awardid ILIKE '%TSN%'
+AND lgid = 'NL'
+ORDER BY playerid),
+
+al AS (SELECT playerid, awardid, yearid, lgid
+FROM awardsmanagers
+WHERE awardid ILIKE '%TSN%'
+AND lgid = 'AL'
+ORDER BY playerid)
+
+SELECT sub.playerid, sub.yearid, sub.lgid, p.namefirst, p.namelast, m.teamid, t.name
+FROM (
+	SELECT playerid, awardid, yearid, lgid
+	FROM awardsmanagers
+	WHERE awardid ILIKE '%TSN%'
+	AND playerid IN(
+		SELECT playerid
+		FROM nl
+		INTERSECT
+		SELECT playerid
+		FROM al)) AS sub
+JOIN people AS p
+ON sub.playerid = p.playerid
+JOIN managers AS m
+ON sub.yearid = m.yearid AND sub.playerid = m.playerid
+JOIN teams AS t
+ON m.yearid = t.yearid AND m.teamid = t.teamid;
+--Jim Leyland/Davey Johnson
+
